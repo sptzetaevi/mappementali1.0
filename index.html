@@ -233,6 +233,9 @@
     <button class="btn" id="btnImport">Importa</button>
     <input id="fileInput" type="file" accept=".json,.html" style="display:none" />
 
+        <button class="btn tiny" id="btnZoomIn">+</button>
+    <button class="btn tiny" id="btnZoomOut">-</button>
+
     <span class="hint">
       Doppio click = crea • Trascina = sposta • <kbd>L</kbd>/Collega = collega • click linea = seleziona • <kbd>CANC</kbd>/Elimina = elimina • <kbd>ESC</kbd> = annulla
     </span>
@@ -277,6 +280,8 @@
   var btnImport = document.getElementById("btnImport");
   var btnMove = document.getElementById("btnMove");
   var fileInput = document.getElementById("fileInput");
+  var btnZoomIn = document.getElementById("btnZoomIn");
+  var btnZoomOut = document.getElementById("btnZoomOut");
 
   // nuovi controlli testo
   var txtColor = document.getElementById("txtColor");
@@ -421,7 +426,26 @@
     renderLinks();
   }, { passive:false });
 
-  // --- opzioni collegamento (scelte al momento dell'attivazione di "Collega") ---
+
+  function zoomAroundCenter(factor){
+    var br = board.getBoundingClientRect();
+    var cx = br.left + br.width/2;
+    var cy = br.top + br.height/2;
+    var before = screenToWorld(cx, cy);
+
+    view.s = clampScale(view.s * factor);
+
+    var sx = cx - br.left;
+    var sy = cy - br.top;
+
+    view.x = sx - before.x * view.s;
+    view.y = sy - before.y * view.s;
+
+    applyView();
+    renderLinks();
+  }
+
+    // --- opzioni collegamento (scelte al momento dell'attivazione di "Collega") ---
   var linkPreset = { end: "arrow", shape: "straight" }; // default
   var linkModal = null;
 
@@ -764,12 +788,15 @@
 
       if (l.id === selectedLinkId) elWire.classList.add("selected");
 
-      elWire.addEventListener("mousedown", function (e) {
+      function handleSelectLink(e){
         e.stopPropagation();
         setLinkMode(false);
         selectLink(l.id);
         setStatus("Link selezionato.");
-      });
+      }
+      elWire.addEventListener("pointerdown", handleSelectLink);
+      elWire.addEventListener("mousedown", handleSelectLink);
+      elWire.addEventListener("click", handleSelectLink);
 
       svg.appendChild(elWire);
     });
@@ -1020,6 +1047,8 @@
   btnExportJson.addEventListener("click", exportJSON);
   btnExportHtml.addEventListener("click", exportHTML);
   btnImport.addEventListener("click", doImport);
+  btnZoomIn.addEventListener("click", function(){ zoomAroundCenter(1.15); });
+  btnZoomOut.addEventListener("click", function(){ zoomAroundCenter(1/1.15); });
 
   // ---------- eventi controlli testo ----------
   txtColor.addEventListener("input", function(){
