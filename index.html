@@ -11,9 +11,17 @@
     #app { height:100%; display:grid; grid-template-rows:auto 1fr; }
 
     header{
-      display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding:10px 12px;
       background:#fff; border-bottom:1px solid rgba(0,0,0,.08);
       position:sticky; top:0; z-index:10;
+    }
+    .headerInner{
+      display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding:10px 12px;
+    }
+    .headerHandle{
+      width:100%; height:8px; background:rgba(0,0,0,.20); cursor:pointer;
+    }
+    header.collapsed .headerInner{
+      display:none;
     }
     .btn{
       border:1px solid rgba(0,0,0,.18);
@@ -85,22 +93,20 @@
     }
 
     #world{
-  position:absolute;
-  left:0;
-  top:0;
-  width:100%;
-  height:100%;
-  /* lascia passare i click verso lo SVG, ma consenti ai pop di riceverli */
-  pointer-events:none;
-}
+      position:absolute;
+      left:0;
+      top:0;
+      width:100%;
+      height:100%;
+      pointer-events:none;
+    }
 
-    /* SVG: non blocca click su box */
     svg{
       position:absolute; inset:0;
       width:100%;
       height:100%;
       overflow:visible;
-      pointer-events:auto; /* così le linee possono anche essere cliccate */
+      pointer-events:auto;
     }
 
     .pop{
@@ -119,7 +125,7 @@
       align-items:center;
       justify-content:center;
       touch-action: none;
-      pointer-events:auto; /* <- aggiungi questa */
+      pointer-events:auto;
     }
     .pop:active{ cursor:grabbing; }
     .pop.selected{ outline:3px solid rgba(0,120,255,.25); }
@@ -130,7 +136,7 @@
       border:0;
       outline:0;
       resize:none;
-      overflow:hidden;
+      overflow:hidden;   /* niente scrollbar interne, altezza gestita via JS */
       background:transparent;
       color:inherit;
       font-size:14px;
@@ -153,7 +159,6 @@
       stroke-linecap: round;
     }
     .linkLine.selected{
-      stroke: rgba(0,120,255,.85);
       stroke-width: 3;
     }
 
@@ -163,22 +168,55 @@
       font-size:14px; opacity:.55;
     }
 
+    .linkOptions{
+      position:absolute;
+      left:12px;
+      bottom:12px;
+      background:#fff;
+      border-radius:12px;
+      box-shadow:0 6px 18px rgba(0,0,0,.18);
+      padding:6px 8px;
+      display:flex;
+      gap:4px;
+      align-items:center;
+      font-size:12px;
+      z-index:5;
+    }
+    .linkOptions.hidden{
+      display:none;
+    }
+    .linkOptions span{
+      margin-right:4px;
+      opacity:.8;
+    }
+    .linkOptions button{
+      border:1px solid rgba(0,0,0,.2);
+      background:#f9fafb;
+      border-radius:10px;
+      padding:3px 6px;
+      font-size:11px;
+      cursor:pointer;
+      white-space:nowrap;
+    }
+    .linkOptions button.active{
+      background:#2563eb;
+      color:#fff;
+      border-color:#2563eb;
+    }
+
     @media print {
       header { display:none !important; }
       .ghost { display:none !important; }
 
-      /* Mantieni un'altezza reale al layout in stampa */
       html, body { height: 100% !important; }
       #app { height: 100% !important; }
 
-      /* Il board deve avere dimensioni stampabili */
       #board {
         background:#fff !important;
         overflow: visible !important;
-        height: 100vh !important;   /* <-- CHIAVE: altrimenti svg=0 */
+        height: 100vh !important;
       }
 
-      /* SVG deve occupare tutto il board in stampa */
       #wires {
         width: 100% !important;
         height: 100% !important;
@@ -197,7 +235,33 @@
       margin-left:auto;
     }
 
-    /* --- POPUP OPZIONI COLLEGAMENTO --- */
+    .homeLogo{
+      margin-left: 10px;
+      text-decoration: none;
+    }
+    .homeLogo .logoLetters{
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      border: 2px solid rgba(0,0,0,.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 2px;
+      color: var(--ink);
+      background: #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,.12);
+      transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    }
+    .homeLogo:hover .logoLetters{
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(0,0,0,.16);
+      border-color: rgba(0,120,255,.6);
+    }
+
+    /* POPUP COLLEGAMENTO */
     .modalOverlay{
       position:fixed; inset:0;
       background:rgba(0,0,0,.35);
@@ -218,14 +282,14 @@
     .modal .row{ display:flex; gap:12px; flex-wrap:wrap; margin:10px 0; }
     .modal label{ display:flex; gap:8px; align-items:center; font-size:14px; cursor:pointer; }
     .modal .actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:12px; }
-    
   </style>
 </head>
 
 <body>
 <div id="app">
     
-  <header>
+  <header id="mainHeader">
+    <div class="headerInner">
     <button class="btn" id="btnNew">+ Nuovo pop</button>
     <button class="btn" id="btnMove">Sposta</button>
     <button class="btn" id="btnLink">Collega</button>
@@ -237,11 +301,11 @@
     <button class="btn" id="btnImport">Importa</button>
     <input id="fileInput" type="file" accept=".json,.html" style="display:none" />
 
-        <button class="btn tiny" id="btnZoomIn">+</button>
+    <button class="btn tiny" id="btnZoomIn">+</button>
     <button class="btn tiny" id="btnZoomOut">-</button>
 
     <span class="hint">
-      Doppio click = crea • Trascina = sposta • <kbd>L</kbd>/Collega = collega • click linea = seleziona • <kbd>CANC</kbd>/Elimina = elimina • <kbd>ESC</kbd> = annulla
+      Doppio click = crea • Trascina = sposta • click linea = seleziona (per eliminare) • <kbd>CANC</kbd>/Elimina = elimina • <kbd>ESC</kbd> = annulla
     </span>
 
     <!-- CONTROLLI TESTO POP SELEZIONATO -->
@@ -255,6 +319,16 @@
 
     <span class="status" id="status">Avvio...</span>
     <span id="mapTitle">MAPPA MENTALE</span>
+
+    <!-- LOGO/LINK ALLA PAGINA PRINCIPALE ANTIMAPPIFICIO -->
+    <a class="homeLogo"
+       href="https://sptzetaevi.github.io/antimappificio/"
+       title="Torna alla pagina principale ANTIMAPPIFICIO">
+      <span class="logoLetters">A&nbsp;M</span>
+    </a>
+  
+    </div>
+    <div class="headerHandle" id="headerHandle" title="Mostra/nascondi strumenti"></div>
   </header>
 
   <div id="board">
@@ -264,16 +338,49 @@
     </div>
 
     <div class="ghost">Doppio click sullo sfondo per creare un pop</div>
-  </div>
 
+    <div id="linkOptions" class="linkOptions hidden">
+      <span>Linea:</span>
+      <button type="button" data-shape="straight">Retta</button>
+      <button type="button" data-shape="curve">Curva</button>
+    </div>
+  </div>
 <script>
 (function () {
-  // ---------- elementi ----------
   var board = document.getElementById("board");
   var svg = document.getElementById("wires");
   var viewport = document.getElementById("viewport");
   var world = document.getElementById("world");
   var statusEl = document.getElementById("status");
+
+  var linkOptions = document.getElementById("linkOptions");
+  var linkShapeButtons = linkOptions ? linkOptions.querySelectorAll("button[data-shape]") : null;
+
+
+  if (linkShapeButtons) {
+    linkShapeButtons.forEach(function(btn){
+      btn.addEventListener("click", function(){
+        if (!selectedLinkId) return;
+        var l = links.find(function(ll){ return ll.id === selectedLinkId; });
+        if (!l) return;
+        l.shape = btn.dataset.shape || "straight";
+        updateLinkOptionsUI();
+        renderLinks();
+      });
+    });
+  }
+
+  var header = document.getElementById("mainHeader");
+  var headerHandle = document.getElementById("headerHandle");
+  var headerCollapsed = false;
+  if (header && headerHandle) {
+    headerHandle.addEventListener("click", function(e){
+      e.stopPropagation();
+      headerCollapsed = !headerCollapsed;
+      if (headerCollapsed) header.classList.add("collapsed");
+      else header.classList.remove("collapsed");
+    });
+  }
 
   var btnNew = document.getElementById("btnNew");
   var btnLink = document.getElementById("btnLink");
@@ -287,7 +394,6 @@
   var btnZoomIn = document.getElementById("btnZoomIn");
   var btnZoomOut = document.getElementById("btnZoomOut");
 
-  // nuovi controlli testo
   var txtColor = document.getElementById("txtColor");
   var btnSizeSmall = document.getElementById("btnSizeSmall");
   var btnSizeLarge = document.getElementById("btnSizeLarge");
@@ -297,15 +403,13 @@
   function uid(){ return Math.random().toString(36).slice(2, 10); }
   function boardRect(){ return board.getBoundingClientRect(); }
 
-  // ---------- stato ----------
   var pops = [];   // {id,x,y,text,color,size,bold}
-  var links = [];  // {id,from,to,end:"arrow|none",shape:"straight|curve"}
+  var links = [];  // {id,from,to,end,shape}
   var selectedBoxId = null;
   var selectedLinkId = null;
   var linkingFrom = null;
   var moveMode = false;
 
-  // ---------- PAN + ZOOM (mobile + desktop) ----------
   var view = { x: 0, y: 0, s: 1 };
 
   function clampScale(s){
@@ -325,7 +429,6 @@
 
   applyView();
 
-  // Pointer tracking
   var pointers = new Map();
   var panState = null;
   var pinchState = null;
@@ -336,7 +439,6 @@
   }
 
   board.addEventListener("pointerdown", function(e){
-    // se tocchi un box, lascia gestire il drag del box (che fa stopPropagation)
     if (e.target.closest(".pop")) return;
 
     board.setPointerCapture(e.pointerId);
@@ -367,14 +469,12 @@
     if (!pointers.has(e.pointerId)) return;
     pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
 
-    // pinch
     if (pinchState && pointers.size >= 2){
       var arr = Array.from(pointers.values());
       var pA = arr[0], pB = arr[1];
       var d = dist(pA,pB);
       view.s = clampScale(pinchState.startS * (d / pinchState.startD));
 
-      // mantieni fisso il punto sotto alle dita
       var br = board.getBoundingClientRect();
       var midSx = pinchState.midScreen.x - br.left;
       var midSy = pinchState.midScreen.y - br.top;
@@ -387,8 +487,7 @@
       return;
     }
 
-    // pan
-    if (panState && pointers.size === 1){
+    if (pointers.size === 1 && panState){
       view.x = panState.startX + (e.clientX - panState.p0.x);
       view.y = panState.startY + (e.clientY - panState.p0.y);
       applyView();
@@ -410,7 +509,6 @@
     pinchState = null;
   });
 
-  // zoom con CTRL + rotellina (desktop)
   board.addEventListener("wheel", function(e){
     if (!e.ctrlKey) return;
     e.preventDefault();
@@ -449,81 +547,6 @@
     renderLinks();
   }
 
-    // --- opzioni collegamento (scelte al momento dell'attivazione di "Collega") ---
-  var linkPreset = { end: "arrow", shape: "straight" }; // default
-  var linkModal = null;
-
-  function ensureLinkModal() {
-    if (linkModal) return;
-
-    linkModal = document.createElement("div");
-    linkModal.className = "modalOverlay";
-    linkModal.innerHTML =
-      '<div class="modal" role="dialog" aria-modal="true">' +
-        '<h3>Opzioni collegamento</h3>' +
-
-        '<div class="row">' +
-          '<label><input type="radio" name="linkEnd" value="none"> Linea semplice</label>' +
-          '<label><input type="radio" name="linkEnd" value="arrow"> Freccia</label>' +
-        '</div>' +
-
-        '<div class="row">' +
-          '<label><input type="radio" name="linkShape" value="straight"> Retta</label>' +
-          '<label><input type="radio" name="linkShape" value="curve"> Curva</label>' +
-        '</div>' +
-
-        '<div class="actions">' +
-          '<button class="btn" id="linkOptCancel">Annulla</button>' +
-          '<button class="btn" id="linkOptOk">OK</button>' +
-        '</div>' +
-      '</div>';
-
-    document.body.appendChild(linkModal);
-  }
-
-  function openLinkOptions(done) {
-    ensureLinkModal();
-
-    // pre-seleziona valori correnti
-    var endRadio = linkModal.querySelector('input[name="linkEnd"][value="' + linkPreset.end + '"]');
-    var shapeRadio = linkModal.querySelector('input[name="linkShape"][value="' + linkPreset.shape + '"]');
-    if (endRadio) endRadio.checked = true;
-    if (shapeRadio) shapeRadio.checked = true;
-
-    linkModal.style.display = "flex";
-
-    function close() {
-      linkModal.style.display = "none";
-      okBtn.onclick = null;
-      cancelBtn.onclick = null;
-      linkModal.onclick = null;
-    }
-
-    var okBtn = linkModal.querySelector("#linkOptOk");
-    var cancelBtn = linkModal.querySelector("#linkOptCancel");
-
-    okBtn.onclick = function () {
-      var endVal = (linkModal.querySelector('input[name="linkEnd"]:checked') || {}).value || "arrow";
-      var shapeVal = (linkModal.querySelector('input[name="linkShape"]:checked') || {}).value || "straight";
-      linkPreset = { end: endVal, shape: shapeVal };
-      close();
-      done(true);
-    };
-
-    cancelBtn.onclick = function () {
-      close();
-      done(false);
-    };
-
-    // click fuori dal box = annulla
-    linkModal.onclick = function (e) {
-      if (e.target === linkModal) {
-        close();
-        done(false);
-      }
-    };
-  }
-
   function clampToBoard(x, y) {
     if (x < 0) x = 0;
     if (y < 0) y = 0;
@@ -547,7 +570,6 @@
     btnSizeLarge.disabled = false;
     btnBold.disabled = false;
 
-    // default se mancano (vecchie mappe)
     if (!p.color) p.color = "#000000";
     if (!p.size) p.size = "small";
     if (typeof p.bold === "undefined") p.bold = false;
@@ -572,6 +594,25 @@
     enableTextControlsForPop(p);
   }
 
+  function updateLinkOptionsUI() {
+    if (!linkOptions) return;
+    if (!selectedLinkId) {
+      linkOptions.classList.add("hidden");
+      return;
+    }
+    var l = links.find(function(ll){ return ll.id === selectedLinkId; });
+    if (!l) {
+      linkOptions.classList.add("hidden");
+      return;
+    }
+    linkOptions.classList.remove("hidden");
+    if (!linkShapeButtons) return;
+    linkShapeButtons.forEach(function(btn){
+      var shape = l.shape || "straight";
+      btn.classList.toggle("active", btn.dataset.shape === shape);
+    });
+  }
+
   function clearSelections() {
     selectedBoxId = null;
     selectedLinkId = null;
@@ -580,6 +621,7 @@
     var b = document.querySelectorAll(".linkLine");
     for (var j=0;j<b.length;j++) b[j].classList.remove("selected");
     updateTextControls();
+    updateLinkOptionsUI();
   }
 
   function selectBox(id) {
@@ -592,6 +634,7 @@
     var b = document.querySelectorAll(".linkLine");
     for (var j=0;j<b.length;j++) b[j].classList.remove("selected");
     updateTextControls();
+    updateLinkOptionsUI();
   }
 
   function selectLink(id) {
@@ -604,6 +647,7 @@
     var b = document.querySelectorAll(".pop");
     for (var j=0;j<b.length;j++) b[j].classList.remove("selected");
     updateTextControls();
+    updateLinkOptionsUI();
   }
 
   function setLinkMode(on) {
@@ -611,19 +655,13 @@
       if (moveMode) setMoveMode(false);
       if (!selectedBoxId) { setStatus("Seleziona un box prima di collegare."); return; }
 
-      // popup opzioni (freccia/linea, retta/curva)
-      openLinkOptions(function (ok) {
-        if (!ok) { setStatus("Collegamento annullato."); return; }
-
-        linkingFrom = selectedBoxId;
-        btnLink.classList.add("active");
-        var a = document.querySelectorAll(".pop");
-        for (var i=0;i<a.length;i++) {
-          a[i].classList.toggle("linking", a[i].dataset.id === linkingFrom);
-        }
-        setStatus("Modalita collega: clicca un altro box.");
-      });
-
+      linkingFrom = selectedBoxId;
+      btnLink.classList.add("active");
+      var a = document.querySelectorAll(".pop");
+      for (var i=0;i<a.length;i++) {
+        a[i].classList.toggle("linking", a[i].dataset.id === linkingFrom);
+      }
+      setStatus("Modalita collega: clicca un altro box.");
       return;
     } else {
       linkingFrom = null;
@@ -638,7 +676,6 @@
     moveMode = !!on;
 
     if (moveMode) {
-      // se attivo sposta: disattivo collega
       setLinkMode(false);
       btnMove.classList.add("active");
       setStatus("Modalita sposta: trascina i box.");
@@ -647,32 +684,49 @@
       setStatus("Pronto");
     }
 
-    // quando sposta è attivo, blocchiamo l'editing del testo
     var tas = document.querySelectorAll(".pop .body");
     for (var i = 0; i < tas.length; i++) {
       tas[i].readOnly = moveMode;
     }
   }
   
-  function autoGrow(ta) {
+  function autoGrow(ta, popRef) {
+    // Calcola altezza necessaria al contenuto
     ta.style.height = "auto";
-    ta.style.height = ta.scrollHeight + "px";
+    var newH = ta.scrollHeight;
+
+    // Se abbiamo il riferimento al pop, memorizziamo la massima altezza
+    if (popRef) {
+      if (!popRef._maxHeight || newH > popRef._maxHeight) {
+        popRef._maxHeight = newH;
+      }
+      newH = popRef._maxHeight;
+    }
+
+    // Applica sempre l'altezza massima raggiunta
+    ta.style.height = newH + "px";
+  }
+
+  function resizeSelectedTextarea() {
+    if (!selectedBoxId) return;
+    var ta = document.querySelector('.pop[data-id="'+selectedBoxId+'"] .body');
+    var p = pops.find(function(pp){ return pp.id === selectedBoxId; });
+    if (ta && p) autoGrow(ta, p);
   }
 
   function createPop(x, y) {
-    var p = { id: uid(), x: x, y: y, text: "", color:"#000000", size:"small", bold:false };
+    var p = { id: uid(), x: x, y: y, text: "", color:"#000000", size:"small", bold:false, _maxHeight:0 };
     pops.push(p);
     render();
     selectBox(p.id);
   }
 
-  function addLink(from, to, preset) {
+  function addLink(from, to) {
     if (!from || !to || from === to) return;
     for (var i=0;i<links.length;i++) {
       if (links[i].from === from && links[i].to === to) return;
     }
-    var p = preset || linkPreset || { end:"arrow", shape:"straight" };
-    links.push({ id: uid(), from: from, to: to, end: p.end, shape: p.shape });
+    links.push({ id: uid(), from: from, to: to, end: "arrow", shape: "straight" });
   }
 
   function deleteSelected() {
@@ -700,7 +754,6 @@
     var el = document.querySelector('.pop[data-id="'+id+'"]');
     if (!el) return null;
 
-    // offsetLeft/Top sono in coordinate "mondo" (NON influenzate da transform)
     var x = el.offsetLeft;
     var y = el.offsetTop;
     var w = el.offsetWidth;
@@ -721,7 +774,7 @@
   }
 
   function renderLinks() {
-    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    while (svg.firstChild) svg.firstChild.remove();
 
     var NS = "http://www.w3.org/2000/svg";
     var defs = document.createElementNS(NS, "defs");
@@ -753,54 +806,43 @@
       var p1 = edgePoint(A.cx, A.cy, A.hw, A.hh, dx, dy);
       var p2 = edgePoint(B.cx, B.cy, B.hw, B.hh, -dx, -dy);
 
-      var end = l.end || "arrow";       // compatibilità con vecchi file importati
+      var color = "#000000";
+      var toPop = pops.find(function(pp){ return pp.id === l.to; });
+      if (toPop && toPop.color) color = toPop.color;
+
+
+      var elWire = document.createElementNS(NS, "path");
       var shape = l.shape || "straight";
-
-      var elWire;
-
+      var d;
       if (shape === "curve") {
-        // curva: uso un path con Quadratic Bezier
         var mx = (p1.x + p2.x) / 2;
         var my = (p1.y + p2.y) / 2;
-
-        var len = Math.hypot(dx, dy) || 1;
-        var nx = -dy / len;   // normale (perpendicolare)
-        var ny =  dx / len;
-
-        var offset = Math.min(70, Math.max(20, len / 4));// “quanto” curva
-        var cx = mx + nx * offset;
-        var cy = my + ny * offset;
-
-        elWire = document.createElementNS(NS, "path");
-        elWire.setAttribute("fill", "none");
-        elWire.setAttribute("d", "M " + p1.x + " " + p1.y + " Q " + cx + " " + cy + " " + p2.x + " " + p2.y);
+        var nx = -(p2.y - p1.y);
+        var ny = (p2.x - p1.x);
+        var len = Math.sqrt(nx*nx + ny*ny) || 1;
+        var offset = 40;
+        var cx = mx + (nx/len) * offset;
+        var cy = my + (ny/len) * offset;
+        d = "M " + p1.x + " " + p1.y + " Q " + cx + " " + cy + " " + p2.x + " " + p2.y;
       } else {
-        // retta: line
-        elWire = document.createElementNS(NS, "line");
-        elWire.setAttribute("x1", p1.x);
-        elWire.setAttribute("y1", p1.y);
-        elWire.setAttribute("x2", p2.x);
-        elWire.setAttribute("y2", p2.y);
+        d = "M " + p1.x + " " + p1.y + " L " + p2.x + " " + p2.y;
       }
-
-      if (end === "arrow") {
-        elWire.setAttribute("marker-end", "url(#arrow)");
-      }
-
+      elWire.setAttribute("d", d);
+      elWire.setAttribute("marker-end", "url(#arrow)");
       elWire.classList.add("linkLine");
       elWire.dataset.linkid = l.id;
+      elWire.style.stroke = color;
 
       if (l.id === selectedLinkId) elWire.classList.add("selected");
 
-      function handleSelectLink(e){
+      function handlePointerDown(e){
         e.stopPropagation();
         setLinkMode(false);
         selectLink(l.id);
-        setStatus("Link selezionato.");
+        setStatus("Collegamento selezionato.");
       }
-      elWire.addEventListener("pointerdown", handleSelectLink);
-      elWire.addEventListener("mousedown", handleSelectLink);
-      elWire.addEventListener("click", handleSelectLink);
+
+      elWire.addEventListener("pointerdown", handlePointerDown);
 
       svg.appendChild(elWire);
     });
@@ -814,10 +856,10 @@
     if (ghost) ghost.style.display = pops.length ? "none" : "flex";
 
     pops.forEach(function (p) {
-      // default per compatibilità vecchie mappe
       if (!p.color) p.color = "#000000";
       if (!p.size) p.size = "small";
       if (typeof p.bold === "undefined") p.bold = false;
+      if (typeof p._maxHeight === "undefined") p._maxHeight = 0;
 
       var el = document.createElement("div");
       el.className = "pop";
@@ -825,17 +867,18 @@
       el.style.left = p.x + "px";
       el.style.top  = p.y + "px";
 
+      el.style.borderColor = p.color || "#000000";
+
       el.innerHTML = '<textarea class="body" spellcheck="false"></textarea>';
       var ta = el.querySelector(".body");
       ta.value = p.text || "";
 
-      // applica stile testo
       var fontSizePx = (p.size === "large") ? "20px" : "14px";
       ta.style.fontSize = fontSizePx;
       ta.style.fontWeight = p.bold ? "700" : "400";
       ta.style.color = p.color || "#000000";
 
-      autoGrow(ta);
+      autoGrow(ta, p);
 
       if (p.id === selectedBoxId) el.classList.add("selected");
       if (p.id === linkingFrom) el.classList.add("linking");
@@ -848,31 +891,26 @@
 
       ta.addEventListener("input", function (e) {
         p.text = e.target.value;
-        autoGrow(ta);
+        autoGrow(ta, p);
         renderLinks();
       });
 
-      // click ovunque nel box: se in modalita collega, crea link
       el.addEventListener("click", function () {
         if (linkingFrom && linkingFrom !== p.id) {
-          addLink(linkingFrom, p.id, linkPreset);
+          addLink(linkingFrom, p.id);
           setLinkMode(false);
           renderLinks();
           setStatus("Collegamento creato.");
         }
       });
 
-      // drag solo fuori textarea
       var dragging = false, sx=0, sy=0, ox=0, oy=0;
 
       el.addEventListener("pointerdown", function (e) {
-        // Su touch spesso e.button non è 0: quindi non blocchiamo
         if (e.pointerType === "mouse" && e.button !== 0) return;
-
-        // Se NON siamo in modalita sposta e sto toccando la textarea, non trascinare
         if (!moveMode && e.target && e.target.tagName && e.target.tagName.toLowerCase() === "textarea") return;
 
-        e.preventDefault();     // evita scroll/zoom mentre trascini
+        e.preventDefault();
         e.stopPropagation();
 
         setLinkMode(false);
@@ -882,7 +920,6 @@
         sx = e.clientX; sy = e.clientY;
         ox = p.x; oy = p.y;
 
-        // cattura il puntatore: fondamentale su mobile
         if (el.setPointerCapture) el.setPointerCapture(e.pointerId);
 
         function onMove(ev) {
@@ -913,9 +950,8 @@
     updateTextControls();
   }
 
-  // ---------- export/import/pdf ----------
   function getState() {
-    return { version: 1, createdAt: new Date().toISOString(), pops: pops, links: links };
+    return { version: 3, createdAt: new Date().toISOString(), pops: pops, links: links };
   }
 
   function downloadBlob(name, blob) {
@@ -965,12 +1001,10 @@
   function parseImportedText(text) {
     var t = (text || "").trim();
 
-    // Caso 1: JSON puro
     if (t.charAt(0) === "{" || t.charAt(0) === "[") {
       return JSON.parse(t);
     }
 
-    // Caso 2: HTML esportato (textarea nascosta)
     var re = /<textarea[^>]*id=["']popplet_export_data["'][^>]*>([\s\S]*?)<\/textarea>/i;
     var m = text.match(re);
     if (!m) throw new Error("File non riconosciuto");
@@ -980,8 +1014,10 @@
 
   function applyState(state) {
     if (!state || !state.pops || !state.links) throw new Error("Dati incompleti");
+
     pops = state.pops;
     links = state.links;
+
     clearSelections();
     setLinkMode(false);
     render();
@@ -1011,7 +1047,6 @@
     window.print();
   }
 
-  // ---------- eventi ----------
   board.addEventListener("mousedown", function (e) {
     if (e.target === board) {
       clearSelections();
@@ -1034,11 +1069,9 @@
       var inEditor = active && active.tagName === "TEXTAREA";
       if (!inEditor) { e.preventDefault(); deleteSelected(); }
     }
-    if (key === "l") { linkingFrom ? setLinkMode(false) : setLinkMode(true); }
     if (key === "escape") setLinkMode(false);
   });
 
-  // ---------- bottoni ----------
   btnNew.addEventListener("click", function () {
     var r = boardRect();
     createPop(20 + Math.random()*(r.width-260), 20 + Math.random()*(r.height-160));
@@ -1054,14 +1087,19 @@
   btnZoomIn.addEventListener("click", function(){ zoomAroundCenter(1.15); });
   btnZoomOut.addEventListener("click", function(){ zoomAroundCenter(1/1.15); });
 
-  // ---------- eventi controlli testo ----------
   txtColor.addEventListener("input", function(){
     if (!selectedBoxId) return;
     var p = pops.find(function(pp){ return pp.id === selectedBoxId; });
     if (!p) return;
     p.color = txtColor.value || "#000000";
+
     var ta = document.querySelector('.pop[data-id="'+p.id+'"] .body');
     if (ta) ta.style.color = p.color;
+
+    var boxEl = document.querySelector('.pop[data-id="'+p.id+'"]');
+    if (boxEl) boxEl.style.borderColor = p.color;
+
+    renderLinks();
   });
 
   btnSizeSmall.addEventListener("click", function(){
@@ -1072,6 +1110,7 @@
     var ta = document.querySelector('.pop[data-id="'+p.id+'"] .body');
     if (ta) ta.style.fontSize = "14px";
     updateTextControls();
+    resizeSelectedTextarea();
   });
 
   btnSizeLarge.addEventListener("click", function(){
@@ -1082,6 +1121,7 @@
     var ta = document.querySelector('.pop[data-id="'+p.id+'"] .body');
     if (ta) ta.style.fontSize = "20px";
     updateTextControls();
+    resizeSelectedTextarea();
   });
 
   btnBold.addEventListener("click", function(){
@@ -1092,9 +1132,9 @@
     var ta = document.querySelector('.pop[data-id="'+p.id+'"] .body');
     if (ta) ta.style.fontWeight = p.bold ? "700" : "400";
     updateTextControls();
+    resizeSelectedTextarea();
   });
 
-  // ---------- init ----------
   render();
   setStatus("Pronto");
 })();
