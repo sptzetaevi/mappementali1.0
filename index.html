@@ -238,7 +238,7 @@
       border-color: rgba(0,120,255,.6);
     }
 
-    /* POPUP COLLEGAMENTO */
+    /* POPUP generici */
     .modalOverlay{
       position:fixed; inset:0;
       background:rgba(0,0,0,.35);
@@ -283,6 +283,7 @@
       <button class="btn tiny" id="btnPan" title="Pan vista">
         <span aria-hidden="true">✋</span>
       </button>
+      <button class="btn tiny" id="btnKeyboardHelp">Comandi da tastiera</button>
 
       <span class="hint">
         Doppio click = crea box • Trascina sfondo in modalità Pan = sposta vista • click linea = seleziona (per eliminare) • doppio click linea = modifica • <kbd>CANC</kbd>/Elimina = elimina • <kbd>ESC</kbd> = annulla collega
@@ -318,6 +319,20 @@
     <div class="ghost">Doppio click sullo sfondo per creare un pop</div>
   </div>
 
+  <!-- BOX COMANDI DA TASTIERA -->
+  <div class="modalOverlay" id="kbdOverlay">
+    <div class="modal">
+      <h3>Comandi da tastiera</h3>
+      <p style="font-size:14px; line-height:1.4; margin:6px 0 10px;">
+        Doppio click = crea box • Trascina sfondo in modalità Pan = sposta vista • click linea = seleziona (per eliminare) •
+        doppio click linea = modifica • <kbd>CANC</kbd>/Elimina = elimina • <kbd>ESC</kbd> = annulla collega
+      </p>
+      <div class="actions">
+        <button class="btn tiny" id="btnKbdClose">Chiudi</button>
+      </div>
+    </div>
+  </div>
+
 <script>
 (function () {
   var board = document.getElementById("board");
@@ -346,6 +361,9 @@
   var btnImport = document.getElementById("btnImport");
   var btnMove = document.getElementById("btnMove");
   var btnPan = document.getElementById("btnPan");
+  var btnKeyboardHelp = document.getElementById("btnKeyboardHelp");
+  var kbdOverlay = document.getElementById("kbdOverlay");
+  var btnKbdClose = document.getElementById("btnKbdClose");
   var fileInput = document.getElementById("fileInput");
   var btnZoomIn = document.getElementById("btnZoomIn");
   var btnZoomOut = document.getElementById("btnZoomOut");
@@ -764,7 +782,7 @@
     }
   }
   
-  /* NUOVA VERSIONE: cresce ma non si restringe */
+  /* Cresce ma non si restringe */
   function autoGrow(ta, popModel) {
     ta.style.height = "auto";
     var needed = ta.scrollHeight;
@@ -1264,6 +1282,19 @@
       setStatus("Errore import.");
       alert("Import fallito: usa un file esportato da questa app (JSON o HTML).");
     });
+  });
+
+  /* Apertura/chiusura box "Comandi da tastiera" */
+  btnKeyboardHelp.addEventListener("click", function(){
+    kbdOverlay.style.display = "flex";
+  });
+  btnKbdClose.addEventListener("click", function(){
+    kbdOverlay.style.display = "none";
+  });
+  kbdOverlay.addEventListener("click", function(e){
+    if (e.target === kbdOverlay) {
+      kbdOverlay.style.display = "none";
+    }
   });
 
   render();
