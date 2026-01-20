@@ -1,442 +1,247 @@
 <!doctype html>
 <html lang="it">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Mappa mentale</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+  
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+
+  <title>Mappa Mentale Mobile</title>
+  
   <style>
-    :root{
-      --bg: #f2f4f8;
-      --ink:#111;
-      --accent:#0078ff;
+    :root {
+      --bg: #f6f7fb;
+      --grid: rgba(0,0,0,.06);
+      --ink: #1a1a1a;
+      --accent: #0078ff;
+      /* SAFE AREAS: Variabili per gestire la "tacca" e la barra home in basso */
+      --safe-top: env(safe-area-inset-top, 20px);
+      --safe-bottom: env(safe-area-inset-bottom, 20px);
+      --controls-bottom: calc(20px + var(--safe-bottom));
     }
 
-    *{ box-sizing:border-box; }
-
-    html, body{
-      margin:0;
-      padding:0;
-      height:100%;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color:var(--ink);
-      background:var(--bg);
+    /* SETUP PAGINA: overflow hidden e position fixed impediscono lo scroll elastico dell'intera pagina */
+    html, body { 
+      height: 100%; 
+      margin: 0; 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+      color: var(--ink);
+      overflow: hidden; 
+      position: fixed;
+      width: 100%;
+      background: var(--bg);
     }
 
-    body{
-      display:flex;
-      flex-direction:column;
+    #app { 
+      height: 100dvh; /* Usa l'altezza dinamica per adattarsi alla barra indirizzi che appare/scompare */
+      display: grid; 
+      grid-template-rows: auto 1fr; 
+      position: relative;
     }
 
-    #app{
-      flex:1;
-      display:flex;
-      flex-direction:column;
-      min-height:0;
+    /* --- HEADER --- */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(10px); /* Effetto vetro tipico di iOS */
+      border-bottom: 1px solid rgba(0,0,0,.1);
+      box-shadow: 0 2px 10px rgba(0,0,0,.03);
+      padding-top: var(--safe-top); /* Spazio per la tacca */
+      transition: transform 0.3s ease;
     }
 
-    header{
-      position:relative;
-      background:#fff;
-      border-bottom:1px solid rgba(0,0,0,.08);
-      box-shadow:0 2px 4px rgba(0,0,0,.04);
-      z-index:10;
-      transition:transform .2s ease, box-shadow .2s ease, opacity .2s ease;
-    }
-    header.collapsed{
-      transform:translateY(calc(-100% + 14px));
-      box-shadow:none;
-      opacity:0.96;
+    /* Quando l'header è chiuso (es. mentre scrivi) */
+    header.collapsed {
+      transform: translateY(calc(-100% + 24px + var(--safe-top)));
     }
 
-    .headerInner{
-      display:flex;
-      align-items:center;
-      gap:6px;
-      padding:6px 10px;
-      font-size:14px;
+    .headerInner {
+      display: flex;
+      gap: 8px;
+      padding: 10px 12px;
+      overflow-x: auto; /* Permette lo scroll orizzontale su schermi piccolissimi */
+      scrollbar-width: none;
     }
+    .headerInner::-webkit-scrollbar { display: none; }
 
-    .headerHandle{
-      position:absolute;
-      left:50%;
-      bottom:-10px;
-      width:70px;
-      height:20px;
-      border-radius:99px;
-      background:#fff;
-      border:1px solid rgba(0,0,0,.12);
-      box-shadow:0 3px 8px rgba(0,0,0,.10);
-      transform:translateX(-50%);
-      cursor:pointer;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-    }
-    .headerHandle::before{
-      content:"";
-      width:26px;
-      height:3px;
-      border-radius:999px;
-      background:rgba(0,0,0,.28);
-    }
-
-    .btn{
-      border-radius:999px;
-      border:1px solid rgba(0,0,0,.18);
-      background:#fff;
-      padding:4px 10px;
-      font-size:13px;
-      cursor:pointer;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      gap:4px;
-      transition:background .12s ease, box-shadow .12s ease, border-color .12s ease, transform .05s ease;
-      user-select:none;
-      white-space:nowrap;
-    }
-    .btn:hover{
-      background:#f5f7fb;
-      box-shadow:0 1px 3px rgba(0,0,0,.12);
-    }
-    .btn:active{
-      transform:translateY(1px);
-      box-shadow:none;
-    }
-    .btn.tiny{
-      padding:2px 8px;
-      font-size:12px;
-    }
-    .btn.danger{
-      border-color:rgba(200,0,0,.35);
-      color:#b00020;
-    }
-    .btn.danger:hover{
-      background:#ffecef;
-      box-shadow:0 1px 3px rgba(176,0,32,.35);
-    }
-    .btn.active{
-      background:rgba(0,120,255,.10);
-      border-color:rgba(0,120,255,.8);
-      box-shadow:0 0 0 2px rgba(0,120,255,.25);
-    }
-
-    .status{
-      margin-left:auto;
-      font-size:12px;
-      opacity:.75;
-    }
-
-    #mapTitle {
-      font-size: 22px;
-      font-weight: 800;
-      letter-spacing: 2px;
-      user-select: none;
-      margin-left:auto;
-    }
-
-    .homeLogo{
-      margin-left: 10px;
-      text-decoration: none;
-    }
-    .homeLogo .logoLetters{
-      width: 40px;
-      height: 40px;
-      border-radius: 999px;
-      border: 2px solid rgba(0,0,0,.25);
+    .headerHandle {
+      width: 100%;
+      height: 24px;
+      background: rgba(0,0,0,.03);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 700;
-      font-size: 14px;
-      letter-spacing: 2px;
-      color: var(--ink);
+      cursor: pointer;
+    }
+    .headerHandle::after { 
+      content: ""; 
+      width: 40px; 
+      height: 4px; 
+      background: rgba(0,0,0,0.2); 
+      border-radius: 2px; 
+    }
+
+    /* --- BOTTONI GENERICI --- */
+    .btn {
       background: #fff;
-      box-shadow: 0 2px 6px rgba(0,0,0,.12);
-      transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+      border: 1px solid rgba(0,0,0,.15);
+      border-radius: 10px;
+      padding: 0 14px;
+      height: 44px; /* Altezza minima per touch Apple */
+      font-size: 15px;
+      font-weight: 500;
+      color: #333;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
     }
-    .homeLogo:hover .logoLetters{
-      transform: translateY(-1px);
-      box-shadow: 0 4px 10px rgba(0,0,0,.16);
-      border-color: rgba(0,120,255,.6);
+    .btn:active { background: #f0f0f0; transform: scale(0.98); }
+    .btn.active { background: #eef6ff; border-color: var(--accent); color: var(--accent); }
+    .btn.danger { color: #d32f2f; border-color: #ffcdd2; background: #fffafa; }
+
+    /* Input colore custom */
+    .color-wrapper {
+      position: relative;
+      width: 44px; height: 44px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid rgba(0,0,0,0.15);
+    }
+    input[type="color"] {
+      position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+      border: 0; padding: 0; cursor: pointer;
     }
 
-    .textControls{
-      display:flex;
-      align-items:center;
-      gap:4px;
-      margin-left:10px;
-      font-size:12px;
+    /* --- BOARD E VIEWPORT --- */
+    #board {
+      position: relative;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      touch-action: none; /* Disabilita zoom/pan nativo del browser */
+      cursor: grab;
+      background-image: 
+        radial-gradient(var(--grid) 1px, transparent 1px);
+      background-size: 20px 20px;
     }
-    .textControls > span{
-      opacity:.7;
-    }
-    .textControls input[type="color"]{
-      width:32px;
-      height:22px;
-      padding:0;
-      border-radius:999px;
-      border:1px solid rgba(0,0,0,.18);
-      background:#fff;
-      cursor:pointer;
-    }
+    #board:active { cursor: grabbing; }
 
-    #board{
-      position:relative;
-      flex:1;
-      min-height:0;
-      background:radial-gradient(circle at 0 0, #fff 0, #fff 40%, #f2f4f8 100%);
-      overflow:hidden;
-      touch-action:none;
-    }
-
-    #viewport{
-      position:absolute;
-      inset:0;
-      background-size:24px 24px;
-      background-image:linear-gradient(to right, rgba(0,0,0,.04) 1px, transparent 1px),
-                       linear-gradient(to bottom, rgba(0,0,0,.04) 1px, transparent 1px);
-      transform-origin:0 0;
-    }
-
-    #world{
-      position:absolute;
-      left:0; top:0;
-      width:8000px;
-      height:8000px;
+    #viewport {
+      position: absolute;
+      top: 0; left: 0;
       transform-origin: 0 0;
+      will-change: transform;
     }
 
-    svg{
-      position:absolute; inset:0;
-      width:100%; height:100%;
-      pointer-events:auto;
-    }
-
-    .pop{
-      position:absolute;
-      min-width:8ch;
-      max-width:48ch;
-      background:#fff;
-      border:1px solid rgba(0,0,0,.55);
-      border-radius:999px;
-      box-shadow:0 8px 24px rgba(0,0,0,.10);
-      padding:8px 12px;
-      box-sizing:border-box;
-      user-select:none;
-      cursor:grab;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      touch-action:none;
-    }
-    .pop:active{ cursor:grabbing; }
-    .pop.selected{ outline:3px solid rgba(0,120,255,.25); }
-    .pop.linking{ background:rgba(0,120,255,.08)!important; border-color:rgba(0,120,255,.35)!important; }
-
-    .body{
-      width:100%;
-      border:0;
-      outline:0;
-      resize:none;
-      overflow-y:auto;
-      background:transparent;
-      color:inherit;
-      font-size:18px;
-      line-height:1.3;
-      padding:0;
-      margin:0;
-      box-sizing:border-box;
-      min-height:1.4em;
-      white-space:pre-wrap;
-      word-break:normal;
-      text-align:center;
-      font-weight:700;
-    }
-
-    .body::placeholder{
-      color:rgba(0,0,0,.45);
-      font-size:14px;
-      text-align:center;
-    }
-
-    .linkLine{
-      pointer-events:stroke;
-      cursor:pointer;
-      stroke: rgba(0,0,0,.55);
-      stroke-width: 2;
-      stroke-linecap: round;
-      fill:none;
-    }
-    .linkLine.selected{
-      stroke: rgba(0,120,255,.85);
-      stroke-width: 3;
-    }
-
-    .linkArrow{
-      fill: rgba(0,0,0,.55);
-      pointer-events:none;
-    }
-    .linkLine.selected + .linkArrow{
-      fill: rgba(0,120,255,.85);
-    }
-
-    .linkLabel{
-      font-size:12px;
-      pointer-events:auto;
-      cursor:text;
-      user-select:none;
-    }
-
-    .ghost{
-      position:absolute; inset:0; pointer-events:none;
-      display:flex; align-items:center; justify-content:center;
-      font-size:14px; opacity:.55;
-    }
-
-    /* Controlli flottanti in basso a destra/sinistra */
-    #controlsRight {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
+    /* --- NODI (POPS) --- */
+    .pop {
+      position: absolute;
+      width: 220px;
+      background: #fff;
+      border-radius: 16px;
+      padding: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.05);
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      z-index: 999;
+      border-left: 5px solid var(--accent);
+      transition: box-shadow 0.2s, transform 0.1s;
+    }
+    .pop.selected {
+      box-shadow: 0 8px 30px rgba(0,0,0,0.15), 0 0 0 2px var(--accent);
+      z-index: 10;
     }
 
-    #controlsLeft {
+    textarea.body {
+      width: 100%;
+      border: none;
+      outline: none;
+      resize: none;
+      font-family: inherit;
+      font-size: 17px; /* 16px+ evita lo zoom automatico su iOS */
+      line-height: 1.4;
+      background: transparent;
+      min-height: 24px;
+      padding: 0;
+      margin: 0;
+    }
+
+    /* --- SVG LINKS --- */
+    svg#wires {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      overflow: visible;
+    }
+    .linkLine {
+      stroke: #bbb; stroke-width: 2; fill: none; stroke-linecap: round;
+      transition: stroke 0.2s;
+    }
+    .linkLine.selected { stroke: var(--accent); stroke-width: 3; }
+
+    /* --- CONTROLLI FLOTTANTI --- */
+    #controlsRight, #controlsLeft {
       position: fixed;
-      bottom: 20px;
-      left: 20px;
+      bottom: var(--controls-bottom);
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      z-index: 999;
+      gap: 12px;
+      z-index: 90;
+      pointer-events: none; /* Click passano attraverso l'area vuota */
     }
+    #controlsRight { right: 16px; }
+    #controlsLeft { left: 16px; }
 
-    #controlsRight .btn,
-    #controlsLeft .btn {
+    .btn-float {
       pointer-events: auto;
+      width: 50px; height: 50px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      border: none;
+      font-size: 22px;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.1s;
     }
+    .btn-float:active { transform: scale(0.9); }
+    .btn-float.active { background: var(--accent); color: #fff; }
 
-    /* POPUP generici */
-    .modalOverlay{
-      position:fixed; inset:0;
-      background:rgba(0,0,0,.35);
-      display:none;
-      align-items:center;
-      justify-content:center;
-      z-index:9999;
+    /* --- MODAL HELP --- */
+    #overlayHelp {
+      position: fixed; inset: 0; z-index: 2000;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+      display: none; align-items: center; justify-content: center;
     }
-    .modal{
-      width:min(420px, 92vw);
-      background:#fff;
-      border:1px solid rgba(0,0,0,.25);
-      border-radius:16px;
-      box-shadow:0 16px 50px rgba(0,0,0,.20);
-      padding:14px;
+    .modal {
+      background: #fff; padding: 24px; width: 85%; max-width: 400px;
+      border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
     }
-    .modal h3{ margin:0 0 10px 0; font-size:16px; }
-    .modal .row{ display:flex; gap:12px; flex-wrap:wrap; margin:10px 0; }
-    .modal label{ display:flex; gap:8px; align-items:center; font-size:14px; cursor:pointer; }
-    .modal .actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:12px; }
-
-    /* Pulsante doppio Salva rapido / Opzioni salvataggio */
-    .saveSplit{
-      display:inline-flex;
-      flex-direction:column;
-      margin:0 6px;
-    }
-    .saveSplit .btn{
-      padding:4px 10px;
-      font-size:12px;
-      border-radius:0;
-    }
-    .saveSplit .btn.saveTop{
-      border-radius:10px 10px 0 0;
-      border-bottom-width:0;
-    }
-    .saveSplit .btn.saveBottom{
-      border-radius:0 0 10px 10px;
-    }
-
-    @media print {
-      header { display:none !important; }
-      .ghost { display:none !important; }
-
-      html, body { height: 100% !important; }
-      #app { height: 100% !important; }
-
-      #board {
-        background:#fff !important;
-        overflow: visible !important;
-        height: 100vh !important;
-      }
-
-      #wires {
-        width: 100% !important;
-        height: 100% !important;
-      }
-
-      svg {
-        overflow: visible !important;
-      }
-    }
+    .shortcut-row { display: flex; justify-content: space-between; margin-bottom: 12px; border-bottom:1px solid #eee; padding-bottom:8px;}
+    .key { background: #eee; padding: 2px 8px; border-radius: 6px; font-family: monospace; font-size: 14px; }
   </style>
 </head>
-
 <body>
+
 <div id="app">
-    
   <header id="mainHeader">
     <div class="headerInner">
-      <button class="btn" id="btnNew">+ Nuovo pop</button>
-      <button class="btn" id="btnMove">Sposta</button>
-      <button class="btn" id="btnLink">Collega</button>
+      <button class="btn" id="btnNew">＋ Nuovo</button>
       <button class="btn danger" id="btnDelete">Elimina</button>
-
-      <button class="btn" id="btnPdf">Stampa in PDF</button>
-
-      <!-- Pulsante doppio Salva rapido / Opzioni salvataggio -->
-      <div class="saveSplit">
-        <button class="btn saveTop" id="btnQuickSave">
-          <span>Salva rapido</span>
-        </button>
-        <button class="btn saveBottom" id="btnSaveOptions">
-          <span>Opzioni salvataggio</span>
-        </button>
+      <div class="color-wrapper">
+        <input type="color" id="inputColor" value="#0078ff">
       </div>
-
-      <button class="btn" id="btnImport">Importa HTML/JSON</button>
-      <input id="fileInput" type="file" accept=".json,.html" style="display:none" />
-
-      <button class="btn tiny" id="btnZoomIn">+</button>
-      <button class="btn tiny" id="btnZoomOut">-</button>
-      <button class="btn tiny" id="btnPan" title="Pan vista">
-        <span aria-hidden="true">✋</span>
-      </button>
-      <button class="btn tiny" id="btnKeyboardHelp">Comandi da tastiera</button>
-
-      <div class="textControls">
-        <span>Testo:</span>
-        <input type="color" id="txtColor" value="#000000" disabled>
-        <button class="btn tiny" id="btnSizeSmall" disabled>A-</button>
-        <button class="btn tiny" id="btnSizeLarge" disabled>A+</button>
-        <button class="btn tiny" id="btnBold" disabled><b>B</b></button>
-      </div>
-
-      <span class="status" id="status">Avvio...</span>
-      <span id="mapTitle">MAPPA MENTALE</span>
-
-      <a class="homeLogo"
-         href="https://sptzetaevi.github.io/antimappificio/"
-         title="Torna alla pagina principale ANTIMAPPIFICIO">
-        <span class="logoLetters">A&nbsp;M</span>
-      </a>
+      <div style="flex:1"></div>
+      <button class="btn" id="btnExport">Salva</button>
+      <button class="btn" id="btnImport">Apri</button>
+      <button class="btn" id="btnHelp">?</button>
     </div>
-
-    <div class="headerHandle" id="headerHandle" title="Mostra/nascondi strumenti"></div>
+    <div class="headerHandle" id="headerHandle"></div>
   </header>
 
   <div id="board">
@@ -444,950 +249,411 @@
       <svg id="wires"></svg>
       <div id="world"></div>
     </div>
-
-    <div class="ghost">Doppio click sullo sfondo per creare un pop</div>
   </div>
 
-  <!-- BOX COMANDI DA TASTIERA -->
-  <div class="modalOverlay" id="kbdOverlay">
-    <div class="modal">
-      <h3>Comandi da tastiera</h3>
-      <p style="font-size:14px; line-height:1.4; margin:6px 0 10px;">
-        Doppio click = crea box • Trascina sfondo in modalità Pan = sposta vista • click linea = seleziona (per eliminare) •
-        doppio click linea = modifica • <kbd>CANC</kbd>/Elimina = elimina • <kbd>ESC</kbd> = annulla collega
-      </p>
-      <div class="actions">
-        <button class="btn tiny" id="btnKbdClose">Chiudi</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- PANNELLO OPZIONI SALVATAGGIO -->
-  <div class="modalOverlay" id="saveOverlay">
-    <div class="modal">
-      <h3>Opzioni di salvataggio</h3>
-      <div class="row">
-        <label>
-          <input type="radio" name="saveFormat" value="json" checked>
-          JSON (dati della mappa)
-        </label>
-        <label>
-          <input type="radio" name="saveFormat" value="html">
-          HTML (pagina con file incorporato)
-        </label>
-      </div>
-      <div class="row">
-        <label style="flex:1; flex-direction:column; align-items:flex-start;">
-          <span>Nome file:</span>
-          <input type="text" id="saveFileName"
-                 style="width:100%; margin-top:4px; padding:4px 6px; font-size:14px; box-sizing:border-box;">
-        </label>
-      </div>
-      <p style="font-size:12px; opacity:0.8; margin:4px 0 0;">
-        Puoi scrivere il nome senza estensione: verrà aggiunta automaticamente (.json o .html).
-      </p>
-      <div class="actions">
-        <button class="btn tiny" id="btnSaveCancel">Annulla</button>
-        <button class="btn tiny" id="btnSaveConfirm">Salva</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Controlli flottanti -->
   <div id="controlsLeft">
-    <button class="btn" id="btnMove_f">Sposta</button>
-    <button class="btn" id="btnLink_f">Collega</button>
+    <button class="btn-float" id="btnLinkMode" title="Collega">🔗</button>
   </div>
 
   <div id="controlsRight">
-    <button class="btn tiny" id="btnZoomIn_f">+</button>
-    <button class="btn tiny" id="btnZoomOut_f">-</button>
-    <button class="btn tiny" id="btnPan_f" title="Pan vista">✋</button>
+    <button class="btn-float" id="btnZoomIn">＋</button>
+    <button class="btn-float" id="btnZoomOut">－</button>
+    <button class="btn-float" id="btnFit">🎯</button>
   </div>
-
 </div>
 
+<div id="overlayHelp">
+  <div class="modal">
+    <h3>Comandi</h3>
+    <div class="shortcut-row"><span>Nuovo Pop</span> <span class="key">Doppio Click</span></div>
+    <div class="shortcut-row"><span>Sposta Mappa</span> <span class="key">Trascinare sfondo</span></div>
+    <div class="shortcut-row"><span>Sposta Pop</span> <span class="key">Trascinare pop</span></div>
+    <div class="shortcut-row"><span>Zoom</span> <span class="key">Pizzica / +/-</span></div>
+    <div class="shortcut-row"><span>Collega</span> <span class="key">Tasto 🔗 poi tocca altro pop</span></div>
+    <br>
+    <button class="btn" style="width:100%" id="btnCloseHelp">Chiudi</button>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept=".json" style="display: none;" />
+
 <script>
-(function () {
-  var board = document.getElementById("board");
-  var svg = document.getElementById("wires");
-  var viewport = document.getElementById("viewport");
-  var world = document.getElementById("world");
-  var statusEl = document.getElementById("status");
+(function() {
+  // --- STATO DELL'APP ---
+  let pops = [];
+  let links = [];
+  let view = { x: 0, y: 0, scale: 1 };
+  
+  let selectedId = null;
+  let linkMode = false;
+  let linkingSourceId = null;
+  
+  // Elementi DOM
+  const dom = {
+    app: document.getElementById('app'),
+    header: document.getElementById('mainHeader'),
+    board: document.getElementById('board'),
+    viewport: document.getElementById('viewport'),
+    world: document.getElementById('world'),
+    svg: document.getElementById('wires'),
+    colorInput: document.getElementById('inputColor'),
+    fileInput: document.getElementById('fileInput'),
+    btnLink: document.getElementById('btnLinkMode')
+  };
 
-  var header = document.getElementById("mainHeader");
-  var headerHandle = document.getElementById("headerHandle");
-  var headerCollapsed = false;
-
-  headerHandle.addEventListener("click", function(e){
-    e.stopPropagation();
-    headerCollapsed = !headerCollapsed;
-    if (headerCollapsed) header.classList.add("collapsed");
-    else header.classList.remove("collapsed");
-  });
-
-  var btnNew = document.getElementById("btnNew");
-  var btnLink = document.getElementById("btnLink");
-  var btnDelete = document.getElementById("btnDelete");
-  var btnPdf = document.getElementById("btnPdf");
-  var btnImport = document.getElementById("btnImport");
-
-  // Nuovi pulsanti salvataggio
-  var btnQuickSave    = document.getElementById("btnQuickSave");
-  var btnSaveOptions  = document.getElementById("btnSaveOptions");
-  var saveOverlay     = document.getElementById("saveOverlay");
-  var saveFileNameInp = document.getElementById("saveFileName");
-  var btnSaveCancel   = document.getElementById("btnSaveCancel");
-  var btnSaveConfirm  = document.getElementById("btnSaveConfirm");
-
-  var btnMove = document.getElementById("btnMove");
-  var btnPan = document.getElementById("btnPan");
-  var btnKeyboardHelp = document.getElementById("btnKeyboardHelp");
-  var kbdOverlay = document.getElementById("kbdOverlay");
-  var btnKbdClose = document.getElementById("btnKbdClose");
-  var fileInput = document.getElementById("fileInput");
-  var btnZoomIn = document.getElementById("btnZoomIn");
-  var btnZoomOut = document.getElementById("btnZoomOut");
-
-  // Bottoni flottanti
-  var btnZoomIn_f  = document.getElementById("btnZoomIn_f");
-  var btnZoomOut_f = document.getElementById("btnZoomOut_f");
-  var btnPan_f     = document.getElementById("btnPan_f");
-  var btnMove_f    = document.getElementById("btnMove_f");
-  var btnLink_f    = document.getElementById("btnLink_f");
-
-  var txtColor = document.getElementById("txtColor");
-  var btnSizeSmall = document.getElementById("btnSizeSmall");
-  var btnSizeLarge = document.getElementById("btnSizeLarge");
-  var btnBold = document.getElementById("btnBold");
-
-  var pops = [];
-  var links = [];
-  var selectedBoxId = null;
-  var selectedLinkId = null;
-  var linkingFrom = null;
-  var moveMode = false;
-  var panMode = false;
-
-  var view = { x:0, y:0, s:1 };
-
-  var lastSaveBaseName = "";
-  var lastSaveFormat   = "json";
-
-  var linkPreset = { end: "arrow", shape: "straight", curveDir: 1 };
-  var linkModal = null;
-
-  function setStatus(msg) {
-    if (statusEl) statusEl.textContent = msg;
+  // --- INIZIALIZZAZIONE ---
+  function init() {
+    // Carica dati se esistono (opzionale) o crea un nodo iniziale
+    createPop(window.innerWidth / 2 - 110, window.innerHeight / 2 - 100, "Inizia qui...");
+    centerView();
+    setupEvents();
+    loop();
   }
 
-  function uid() {
-    return "p" + Math.random().toString(36).slice(2);
-  }
+  // --- EVENT HANDLING ---
+  function setupEvents() {
+    // 1. Gestione PAN della mappa (Pointer Events per Mouse e Touch)
+    let isPanning = false;
+    let lastP = { x: 0, y: 0 };
+    let pointers = []; // Per gestire il pinch-to-zoom
+    let initDist = 0;
+    let initScale = 1;
 
-  function boardRect() {
-    return board.getBoundingClientRect();
-  }
-
-  function screenToWorld(sx, sy) {
-    var r = boardRect();
-    var x = (sx - r.left - view.x) / view.s;
-    var y = (sy - r.top  - view.y) / view.s;
-    return { x:x, y:y };
-  }
-
-  function applyCamera() {
-    viewport.style.transform =
-      "translate(" + view.x + "px," + view.y + "px) scale(" + view.s + ")";
-  }
-
-  function clampToBoard(x, y) {
-    if (x < 10) x = 10;
-    if (y < 10) y = 10;
-    if (x > 7800) x = 7800;
-    if (y > 7800) y = 7800;
-    return { x:x, y:y };
-  }
-
-  function zoomAroundCenter(factor) {
-    var r = boardRect();
-    var cx = r.left + r.width/2;
-    var cy = r.top  + r.height/2;
-
-    var before = screenToWorld(cx, cy);
-    var newS = view.s * factor;
-    if (newS < 0.25) newS = 0.25;
-    if (newS > 4.0) newS = 4.0;
-    view.s = newS;
-
-    var after = screenToWorld(cx, cy);
-    view.x += (after.x - before.x) * view.s;
-    view.y += (after.y - before.y) * view.s;
-
-    applyCamera();
-    renderLinks();
-  }
-
-  function clearSelections() {
-    selectedBoxId = null;
-    selectedLinkId = null;
-
-    var a = document.querySelectorAll(".pop");
-    for (var i=0;i<a.length;i++) a[i].classList.remove("selected","linking");
-
-    var b = document.querySelectorAll(".linkLine");
-    for (var j=0;j<b.length;j++) b[j].classList.remove("selected");
-
-    updateTextControls();
-  }
-
-  function selectBox(id) {
-    selectedBoxId = id;
-    selectedLinkId = null;
-    var a = document.querySelectorAll(".pop");
-    for (var i=0;i<a.length;i++) {
-      a[i].classList.toggle("selected", a[i].dataset.id === id);
-      a[i].classList.remove("linking");
-    }
-    var b = document.querySelectorAll(".linkLine");
-    for (var j=0;j<b.length;j++) b[j].classList.remove("selected");
-    updateTextControls();
-  }
-
-  function selectLink(id) {
-    selectedLinkId = id;
-    selectedBoxId = null;
-    var a = document.querySelectorAll(".linkLine");
-    for (var i=0;i<a.length;i++) {
-      a[i].classList.toggle("selected", a[i].dataset.linkid === id);
-    }
-    var b = document.querySelectorAll(".pop");
-    for (var j=0;j<b.length;j++) b[j].classList.remove("selected");
-    updateTextControls();
-  }
-
-  function setLinkMode(on) {
-    if (on) {
-      if (moveMode) setMoveMode(false);
-      if (!selectedBoxId) { setStatus("Seleziona un box prima di collegare."); return; }
-      linkingFrom = selectedBoxId;
-      btnLink.classList.add("active");
-      if (btnLink_f) btnLink_f.classList.add("active");
-      var a = document.querySelectorAll(".pop");
-      for (var i=0;i<a.length;i++) {
-        a[i].classList.toggle("linking", a[i].dataset.id === linkingFrom);
+    dom.board.addEventListener('pointerdown', e => {
+      // Se clicco su un pop o svg, non faccio pan
+      if (e.target.closest('.pop')) return;
+      
+      dom.board.setPointerCapture(e.pointerId);
+      pointers.push(e);
+      
+      if (pointers.length === 1) {
+        isPanning = true;
+        lastP = { x: e.clientX, y: e.clientY };
+      } else if (pointers.length === 2) {
+        // Inizio pinch
+        isPanning = false;
+        initDist = getDist(pointers[0], pointers[1]);
+        initScale = view.scale;
       }
-      setStatus("Modalità collega: clicca un altro box.");
+      
+      // Deseleziona se clicco sullo sfondo
+      if (e.target === dom.board || e.target === dom.viewport) {
+        selectPop(null);
+        dom.header.classList.remove('collapsed'); // Riapri header se clicco fuori
+        document.activeElement.blur(); // Chiudi tastiera
+      }
+    });
+
+    dom.board.addEventListener('pointermove', e => {
+      // Aggiorna pointer cache
+      const index = pointers.findIndex(p => p.pointerId === e.pointerId);
+      if (index > -1) pointers[index] = e;
+
+      if (pointers.length === 2) {
+        // GESTIONE PINCH ZOOM
+        const dist = getDist(pointers[0], pointers[1]);
+        const mid = getMid(pointers[0], pointers[1]);
+        const newScale = initScale * (dist / initDist);
+        zoomAt(newScale, mid.x, mid.y);
+        return;
+      }
+
+      if (isPanning && pointers.length === 1) {
+        const dx = e.clientX - lastP.x;
+        const dy = e.clientY - lastP.y;
+        view.x += dx;
+        view.y += dy;
+        lastP = { x: e.clientX, y: e.clientY };
+        applyView();
+      }
+    });
+
+    const endPointer = (e) => {
+      const index = pointers.findIndex(p => p.pointerId === e.pointerId);
+      if (index > -1) pointers.splice(index, 1);
+      if (pointers.length < 2) initDist = 0;
+      if (pointers.length === 0) isPanning = false;
+    };
+    dom.board.addEventListener('pointerup', endPointer);
+    dom.board.addEventListener('pointercancel', endPointer);
+
+    // 2. Doppio click per creare nuovo nodo
+    dom.board.addEventListener('dblclick', e => {
+      if (e.target === dom.board || e.target === dom.viewport) {
+        const wPos = screenToWorld(e.clientX, e.clientY);
+        createPop(wPos.x - 110, wPos.y - 30); // Centra approssimativamente
+      }
+    });
+
+    // 3. Header e Controlli
+    document.getElementById('headerHandle').onclick = () => dom.header.classList.toggle('collapsed');
+    document.getElementById('btnNew').onclick = () => {
+      // Crea al centro dello schermo
+      const c = screenToWorld(window.innerWidth/2, window.innerHeight/2);
+      createPop(c.x - 110, c.y - 30);
+    };
+    document.getElementById('btnDelete').onclick = deleteSelected;
+    
+    // Zoom Buttons
+    document.getElementById('btnZoomIn').onclick = () => zoomAt(view.scale * 1.2, window.innerWidth/2, window.innerHeight/2);
+    document.getElementById('btnZoomOut').onclick = () => zoomAt(view.scale / 1.2, window.innerWidth/2, window.innerHeight/2);
+    document.getElementById('btnFit').onclick = centerView;
+
+    // Link Mode
+    dom.btnLink.onclick = () => {
+      if (!selectedId) {
+        alert("Seleziona prima un nodo da cui partire.");
+        return;
+      }
+      linkMode = !linkMode;
+      linkingSourceId = selectedId;
+      dom.btnLink.classList.toggle('active', linkMode);
+    };
+
+    // Color Picker
+    dom.colorInput.oninput = (e) => {
+      if (selectedId) {
+        const p = pops.find(x => x.id === selectedId);
+        if (p) { p.color = e.target.value; render(); }
+      }
+    };
+
+    // Import/Export
+    document.getElementById('btnExport').onclick = exportData;
+    document.getElementById('btnImport').onclick = () => dom.fileInput.click();
+    dom.fileInput.onchange = importData;
+
+    // Help
+    const help = document.getElementById('overlayHelp');
+    document.getElementById('btnHelp').onclick = () => help.style.display = "flex";
+    document.getElementById('btnCloseHelp').onclick = () => help.style.display = "none";
+    help.onclick = (e) => { if(e.target === help) help.style.display = "none"; };
+  }
+
+  // --- LOGICA CORE ---
+
+  function createPop(x, y, text = "") {
+    const id = "p_" + Date.now() + Math.random().toString(16).slice(2);
+    const p = { id, x, y, text, color: dom.colorInput.value };
+    pops.push(p);
+    render();
+    selectPop(id);
+    return id;
+  }
+
+  function deleteSelected() {
+    if (!selectedId) return;
+    if (!confirm("Eliminare questo elemento?")) return;
+    
+    pops = pops.filter(p => p.id !== selectedId);
+    links = links.filter(l => l.from !== selectedId && l.to !== selectedId);
+    selectPop(null);
+    render();
+  }
+
+  function selectPop(id) {
+    selectedId = id;
+    render(); // Per aggiornare classi CSS
+    
+    if (id) {
+      const p = pops.find(x => x.id === id);
+      dom.colorInput.value = p.color;
     } else {
-      linkingFrom = null;
-      btnLink.classList.remove("active");
-      if (btnLink_f) btnLink_f.classList.remove("active");
-      var b = document.querySelectorAll(".pop");
-      for (var j=0;j<b.length;j++) b[j].classList.remove("linking");
-      setStatus("Pronto");
+      linkMode = false;
+      dom.btnLink.classList.remove('active');
     }
-  }
-
-  function setMoveMode(on) {
-    moveMode = !!on;
-
-    if (moveMode) {
-      setLinkMode(false);
-      setPanMode(false);
-      btnMove.classList.add("active");
-      if (btnMove_f) btnMove_f.classList.add("active");
-      setStatus("Modalità sposta: trascina i box.");
-    } else {
-      btnMove.classList.remove("active");
-      if (btnMove_f) btnMove_f.classList.remove("active");
-      setStatus("Pronto");
-    }
-
-    var tas = document.querySelectorAll(".pop .body");
-    for (var i = 0; i < tas.length; i++) {
-      tas[i].readOnly = moveMode;
-    }
-  }
-
-  function setPanMode(on){
-    panMode = !!on;
-    if (panMode){
-      btnPan.classList.add("active");
-      if (btnPan_f) btnPan_f.classList.add("active");
-      setStatus("Modalità Pan: trascina lo sfondo per spostarti.");
-    } else {
-      btnPan.classList.remove("active");
-      if (btnPan_f) btnPan_f.classList.remove("active");
-      setStatus("Pronto");
-    }
-  }
-
-  function autoGrow(ta, popModel) {
-    ta.style.height = "auto";
-    ta.style.height = (ta.scrollHeight || 24) + "px";
-    var h = ta.offsetHeight || 24;
-    popModel.height = h + 8;
-    var box = ta.closest(".pop");
-    if (box) {
-      box.style.height = popModel.height + "px";
-    }
-  }
-
-  function addLink(from, to, preset) {
-    if (!from || !to || from === to) return;
-    var id = "l" + Math.random().toString(36).slice(2);
-    links.push({
-      id:id,
-      from:from,
-      to:to,
-      label:"",
-      end:(preset && preset.end) || "arrow",
-      shape:(preset && preset.shape) || "straight",
-      curveDir:(preset && typeof preset.curveDir==="number" ? preset.curveDir : 1)
-    });
-  }
-
-  function ensureLinkModal() {
-    if (linkModal) return;
-
-    linkModal = document.createElement("div");
-    linkModal.className = "modalOverlay";
-    linkModal.innerHTML =
-      '<div class="modal" role="dialog" aria-modal="true">' +
-        '<h3>Opzioni collegamento</h3>' +
-        '<div class="row">' +
-          '<label><input type="radio" name="linkEnd" value="none"> Linea semplice</label>' +
-          '<label><input type="radio" name="linkEnd" value="arrow"> Freccia</label>' +
-        '</div>' +
-        '<div class="row">' +
-          '<label><input type="radio" name="linkShape" value="straight"> Retta</label>' +
-          '<label><input type="radio" name="linkShape" value="curve"> Curva</label>' +
-        '</div>' +
-        '<div class="row" data-curve-row>' +
-          '<label><input type="radio" name="curveDir" value="down"> Curva verso il basso</label>' +
-          '<label><input type="radio" name="curveDir" value="up"> Curva verso l\'alto</label>' +
-        '</div>' +
-        '<div class="actions">' +
-          '<button class="btn" id="linkOptCancel">Annulla</button>' +
-          '<button class="btn" id="linkOptOk">OK</button>' +
-        '</div>' +
-      '</div>';
-
-    document.body.appendChild(linkModal);
-
-    var shapeRadios = linkModal.querySelectorAll('input[name="linkShape"]');
-    var curveRadios = linkModal.querySelectorAll('input[name="curveDir"]');
-    var curveLabels = [];
-    curveRadios.forEach(function(r){
-      if (r.parentElement) curveLabels.push(r.parentElement);
-    });
-
-    function updateCurveRadiosDisabled() {
-      var shapeVal = (linkModal.querySelector('input[name="linkShape"]:checked') || {}).value;
-      var disabled = shapeVal !== 'curve';
-
-      curveRadios.forEach(function(r){
-        r.disabled = disabled;
-      });
-      curveLabels.forEach(function(lbl){
-        lbl.style.opacity = disabled ? 0.5 : 1;
-      });
-    }
-
-    shapeRadios.forEach(function(r){
-      r.addEventListener('change', updateCurveRadiosDisabled);
-    });
-
-    linkModal._updateCurveRadiosDisabled = updateCurveRadiosDisabled;
-  }
-
-  function openLinkOptions(done) {
-    ensureLinkModal();
-
-    var endRadio = linkModal.querySelector('input[name="linkEnd"][value="' + linkPreset.end + '"]');
-    var shapeRadio = linkModal.querySelector('input[name="linkShape"][value="' + linkPreset.shape + '"]');
-    if (endRadio) endRadio.checked = true;
-    if (shapeRadio) shapeRadio.checked = true;
-
-    var curveRadio = linkModal.querySelector('input[name="curveDir"][value="' + (linkPreset.curveDir === 1 ? "down" : "up") + '"]');
-    if (curveRadio) curveRadio.checked = true;
-
-    if (typeof linkModal._updateCurveRadiosDisabled === "function") {
-      linkModal._updateCurveRadiosDisabled();
-    }
-
-    linkModal.style.display = "flex";
-
-    var cancelBtn = document.getElementById("linkOptCancel");
-    var okBtn = document.getElementById("linkOptOk");
-
-    function closeModal() {
-      linkModal.style.display = "none";
-      window.removeEventListener("keydown", onKey);
-      cancelBtn.removeEventListener("click", onCancel);
-      okBtn.removeEventListener("click", onOk);
-    }
-
-    function onCancel() {
-      closeModal();
-      if (done) done(null);
-    }
-
-    function onOk() {
-      var endVal = (linkModal.querySelector('input[name="linkEnd"]:checked') || {}).value || "arrow";
-      var shapeVal = (linkModal.querySelector('input[name="linkShape"]:checked') || {}).value || "straight";
-      var curveVal = (linkModal.querySelector('input[name="curveDir"]:checked') || {}).value || "down";
-
-      linkPreset.end = endVal;
-      linkPreset.shape = shapeVal;
-      linkPreset.curveDir = (curveVal === "down" ? 1 : -1);
-
-      closeModal();
-      if (done) done(linkPreset);
-    }
-
-    function onKey(e) {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onCancel();
-      }
-    }
-
-    cancelBtn.addEventListener("click", onCancel);
-    okBtn.addEventListener("click", onOk);
-    window.addEventListener("keydown", onKey);
-  }
-
-  function renderLinks() {
-    svg.innerHTML = "";
-
-    function centerOfPop(p) {
-      return { x:p.x + (p.width || 160)/2, y:p.y + (p.height || 50)/2 };
-    }
-
-    links.forEach(function(l){
-      var from = pops.find(function(p){ return p.id === l.from; });
-      var to   = pops.find(function(p){ return p.id === l.to; });
-      if (!from || !to) return;
-
-      var a = centerOfPop(from);
-      var b = centerOfPop(to);
-
-      var dx = b.x - a.x;
-      var dy = b.y - a.y;
-      var dist = Math.sqrt(dx*dx + dy*dy) || 1;
-      var ux = dx / dist;
-      var uy = dy / dist;
-
-      var offset = 40;
-      var start = { x: a.x + ux*offset, y: a.y + uy*offset };
-      var end   = { x: b.x - ux*offset, y: b.y - uy*offset };
-
-      var pathData;
-      if (l.shape === "curve") {
-        var midx = (start.x + end.x)/2;
-        var midy = (start.y + end.y)/2;
-        var nx = -uy;
-        var ny = ux;
-        var curveAmount = 60 * (l.curveDir || 1);
-        var cx = midx + nx * curveAmount;
-        var cy = midy + ny * curveAmount;
-        pathData = "M " + start.x + " " + start.y +
-                   " Q " + cx + " " + cy +
-                   " " + end.x + " " + end.y;
-      } else {
-        pathData = "M " + start.x + " " + start.y +
-                   " L " + end.x + " " + end.y;
-      }
-
-      var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      path.setAttribute("d", pathData);
-      path.setAttribute("class", "linkLine" + (l.id === selectedLinkId ? " selected" : ""));
-      path.dataset.linkid = l.id;
-      svg.appendChild(path);
-
-      if (l.end === "arrow") {
-        var arrowSize = 8;
-        var ax = end.x;
-        var ay = end.y;
-        var px = -ux;
-        var py = -uy;
-        var leftX  = ax + px*arrowSize - py*(arrowSize*0.7);
-        var leftY  = ay + py*arrowSize + px*(arrowSize*0.7);
-        var rightX = ax + px*arrowSize + py*(arrowSize*0.7);
-        var rightY = ay + py*arrowSize - px*(arrowSize*0.7);
-
-        var arrow = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-        arrow.setAttribute("points", ax + "," + ay + " " + leftX + "," + leftY + " " + rightX + "," + rightY);
-        arrow.setAttribute("class", "linkArrow");
-        svg.appendChild(arrow);
-      }
-
-      if (l.label) {
-        var label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        label.setAttribute("class", "linkLabel");
-        label.setAttribute("text-anchor", "middle");
-        label.setAttribute("alignment-baseline", "central");
-        var mx = (start.x + end.x)/2;
-        var my = (start.y + end.y)/2;
-        label.setAttribute("x", mx);
-        label.setAttribute("y", my - 4);
-
-        label.textContent = l.label;
-        svg.appendChild(label);
-
-        label.addEventListener("click", function(ev){
-          ev.stopPropagation();
-          var newText = prompt("Modifica etichetta del collegamento:", l.label);
-          if (newText !== null) {
-            l.label = newText;
-            renderLinks();
-          }
-        });
-      }
-
-      path.addEventListener("click", function(e){
-        e.stopPropagation();
-        selectLink(l.id);
-        setStatus("Collegamento selezionato.");
-      });
-    });
-  }
-
-  function updateTextControls() {
-    var hasSelection = !!selectedBoxId;
-    txtColor.disabled    = !hasSelection;
-    btnSizeSmall.disabled = !hasSelection;
-    btnSizeLarge.disabled = !hasSelection;
-    btnBold.disabled      = !hasSelection;
-
-    if (!hasSelection) return;
-
-    var p = pops.find(function(pp){ return pp.id === selectedBoxId; });
-    if (!p) return;
-
-    txtColor.value = p.color || "#000000";
-
-    btnSizeSmall.classList.toggle("active", p.size === "small");
-    btnSizeLarge.classList.toggle("active", p.size === "large");
-    btnBold.classList.toggle("active", !!p.bold);
   }
 
   function render() {
-    world.innerHTML = "";
-
-    pops.forEach(function(p){
-      var el = document.createElement("div");
+    // Render Pops
+    dom.world.innerHTML = "";
+    pops.forEach(p => {
+      const el = document.createElement('div');
       el.className = "pop";
-      el.dataset.id = p.id;
+      if (p.id === selectedId) el.classList.add('selected');
       el.style.left = p.x + "px";
-      el.style.top  = p.y + "px";
-      el.style.borderColor = p.color || "#000000";
+      el.style.top = p.y + "px";
+      el.style.borderLeftColor = p.color;
 
-      var ta = document.createElement("textarea");
+      const ta = document.createElement('textarea');
       ta.className = "body";
-      ta.value = p.text || "";
-      ta.style.fontSize   = (p.size === "large" ? "20px" : "18px");
-      ta.style.fontWeight = p.bold ? "700" : "700";
-      ta.style.color      = p.color || "#000000";
-      ta.placeholder = "";
+      ta.value = p.text;
+      ta.placeholder = "Scrivi...";
+      
+      // Auto-resize
+      ta.style.height = 'auto'; 
+      setTimeout(() => ta.style.height = ta.scrollHeight + 'px', 0);
+
+      // Eventi Input
+      ta.addEventListener('input', (e) => {
+        p.text = e.target.value;
+        ta.style.height = 'auto';
+        ta.style.height = ta.scrollHeight + 'px';
+        renderLinks(); // Aggiorna linee se la dimensione cambia
+      });
+
+      // Eventi Focus per iPhone
+      ta.addEventListener('focus', () => {
+        selectPop(p.id);
+        // Su mobile, chiudi header e centra
+        if (window.innerWidth < 800) {
+          dom.header.classList.add('collapsed');
+          setTimeout(() => {
+            el.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+          }, 300);
+        }
+      });
+
+      // Dragging del nodo
+      el.addEventListener('pointerdown', e => {
+        if (linkMode) {
+          e.stopPropagation();
+          if (linkingSourceId && linkingSourceId !== p.id) {
+            links.push({ from: linkingSourceId, to: p.id });
+            linkMode = false;
+            dom.btnLink.classList.remove('active');
+            renderLinks();
+          }
+          return;
+        }
+
+        if (e.target === ta) return; // Lascia gestire il focus al textarea
+
+        selectPop(p.id);
+        e.stopPropagation(); // Evita pan board
+        el.setPointerCapture(e.pointerId);
+        
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const origX = p.x;
+        const origY = p.y;
+
+        const onMove = (mv) => {
+          const dx = (mv.clientX - startX) / view.scale;
+          const dy = (mv.clientY - startY) / view.scale;
+          p.x = origX + dx;
+          p.y = origY + dy;
+          el.style.left = p.x + "px";
+          el.style.top = p.y + "px";
+          renderLinks();
+        };
+        
+        const onUp = () => {
+          el.removeEventListener('pointermove', onMove);
+          el.removeEventListener('pointerup', onUp);
+        };
+        
+        el.addEventListener('pointermove', onMove);
+        el.addEventListener('pointerup', onUp);
+      });
 
       el.appendChild(ta);
-
-      if (typeof p.height === "number" && p.height > 0) {
-        ta.style.height = p.height + "px";
-      } else {
-        autoGrow(ta, p);
-      }
-
-      if (p.id === selectedBoxId) el.classList.add("selected");
-      if (p.id === linkingFrom) el.classList.add("linking");
-
-      ta.addEventListener("focus", function () { selectBox(p.id); });
-      ta.addEventListener("mousedown", function (e) {
-        selectBox(p.id);
-        if (linkingFrom && linkingFrom !== p.id) e.preventDefault();
-      });
-
-      ta.addEventListener("input", function (e) {
-        p.text = e.target.value;
-        autoGrow(ta, p);
-        renderLinks();
-      });
-
-      el.addEventListener("click", function () {
-        if (linkingFrom && linkingFrom !== p.id) {
-          addLink(linkingFrom, p.id, linkPreset);
-          setLinkMode(false);
-          renderLinks();
-          setStatus("Collegamento creato.");
-        }
-      });
-
-      var dragging = false, sx=0, sy=0, ox=0, oy=0;
-
-      el.addEventListener("pointerdown", function (e) {
-        if (e.pointerType === "mouse" && e.button !== 0) return;
-        if (!moveMode && e.target && e.target.tagName && e.target.tagName.toLowerCase() === "textarea") return;
-
-        e.preventDefault();
-        e.stopPropagation();
-
-        setLinkMode(false);
-        selectBox(p.id);
-
-        dragging = true;
-        sx = e.clientX; sy = e.clientY;
-        ox = p.x; oy = p.y;
-
-        if (el.setPointerCapture) el.setPointerCapture(e.pointerId);
-
-        function onMove(ev) {
-          if (!dragging) return;
-          var dx = (ev.clientX - sx) / view.s;
-          var dy = (ev.clientY - sy) / view.s;
-          var pos = clampToBoard(ox + dx, oy + dy);
-          p.x = pos.x; p.y = pos.y;
-          el.style.left = p.x + "px";
-          el.style.top  = p.y + "px";
-          renderLinks();
-        }
-
-        function onUp(ev) {
-          dragging = false;
-          window.removeEventListener("pointermove", onMove);
-          window.removeEventListener("pointerup", onUp);
-        }
-
-        window.addEventListener("pointermove", onMove, { passive:false });
-        window.addEventListener("pointerup", onUp, { passive:true });
-      });
-
-      world.appendChild(el);
+      dom.world.appendChild(el);
     });
 
     renderLinks();
-    updateTextControls();
   }
 
-  function getState() {
-    return { version: 3, createdAt: new Date().toISOString(), pops: pops, links: links };
+  function renderLinks() {
+    // Semplice rendering SVG
+    let html = "";
+    links.forEach(l => {
+      const p1 = pops.find(x => x.id === l.from);
+      const p2 = pops.find(x => x.id === l.to);
+      if (!p1 || !p2) return;
+      
+      // Calcolo centro approssimativo (width=220 + padding)
+      const x1 = p1.x + 120, y1 = p1.y + 40;
+      const x2 = p2.x + 120, y2 = p2.y + 40;
+      
+      const isSel = (l.from === selectedId || l.to === selectedId);
+      const cls = isSel ? "linkLine selected" : "linkLine";
+      
+      html += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}" />`;
+    });
+    dom.svg.innerHTML = html;
   }
 
-  function downloadBlob(name, blob) {
-    var a = document.createElement("a");
-    var url = URL.createObjectURL(blob);
-    a.href = url;
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  // --- UTILS VISTA ---
+  function applyView() {
+    dom.viewport.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
   }
 
-  function exportJSON(customBaseName) {
-    var blob = new Blob([JSON.stringify(getState(), null, 2)], { type: "application/json;charset=utf-8" });
-
-    var filename;
-    if (customBaseName && customBaseName.trim()) {
-      var base = customBaseName.trim();
-      if (!/\.(json)$/i.test(base)) base += ".json";
-      filename = base;
-    } else {
-      filename = "mappa_" + new Date().toISOString().slice(0,19).split(":").join("-") + ".json";
-    }
-
-    downloadBlob(filename, blob);
-    setStatus("Esportato JSON (" + filename + ").");
+  function screenToWorld(sx, sy) {
+    return {
+      x: (sx - view.x) / view.scale,
+      y: (sy - view.y) / view.scale
+    };
   }
 
-  function exportHTML(customBaseName) {
-    var state = JSON.stringify(getState(), null, 2);
+  function zoomAt(newScale, screenX, screenY) {
+    // Zoom verso il punto del mouse/dito
+    const worldBefore = screenToWorld(screenX, screenY);
+    view.scale = Math.max(0.1, Math.min(5, newScale));
+    const worldAfter = screenToWorld(screenX, screenY);
+    
+    // Compensa lo spostamento
+    view.x += (worldAfter.x - worldBefore.x) * view.scale;
+    view.y += (worldAfter.y - worldBefore.y) * view.scale;
+    
+    applyView();
+  }
 
-    var html =
-      '<!doctype html>' +
-      '<html lang="it">' +
-      '<head>' +
-      '<meta charset="utf-8"/>' +
-      '<meta name="viewport" content="width=device-width, initial-scale=1"/>' +
-      '<title>Mappa esportata</title>' +
-      '</head>' +
-      '<body>' +
-      '<h3>Mappa esportata</h3>' +
-      '<p>Importa questo file nell\\'app con il pulsante Importa.</p>' +
-      '<textarea id="popplet_export_data" style="display:none;">' +
-      state +
-      '</textarea>' +
-      '</body>' +
-      '</html>';
-
-    var blob = new Blob([html], { type: "text/html;charset=utf-8" });
-
-    var filename;
-    if (customBaseName && customBaseName.trim()) {
-      var base = customBaseName.trim();
-      if (!/\.(html?|htm)$/i.test(base)) base += ".html";
-      filename = base;
-    } else {
-      filename = "mappa_" + new Date().toISOString().slice(0,19).replace(/:/g,'-') + ".html";
-    }
-
-    downloadBlob(filename, blob);
-    setStatus("Esportato HTML (" + filename + ").");
+  function getDist(p1, p2) {
+    return Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
   }
   
-  function parseImportedText(text) {
-    var t = (text || "").trim();
+  function getMid(p1, p2) {
+    return { x: (p1.clientX + p2.clientX)/2, y: (p1.clientY + p2.clientY)/2 };
+  }
 
-    if (t.charAt(0) === "{" || t.charAt(0) === "[") {
-      return JSON.parse(t);
+  function centerView() {
+    if (pops.length === 0) {
+      view.x = window.innerWidth/2; 
+      view.y = window.innerHeight/2;
+    } else {
+      // Centra sul primo elemento o media
+      const p = pops[0];
+      view.x = (window.innerWidth/2) - (p.x * view.scale) - 110;
+      view.y = (window.innerHeight/2) - (p.y * view.scale) - 40;
     }
-
-    var re = /<textarea[^>]*id=["']popplet_export_data["'][^>]*>([\s\S]*?)<\/textarea>/i;
-    var m = text.match(re);
-    if (!m) throw new Error("File non riconosciuto");
-
-    return JSON.parse(m[1]);
+    applyView();
   }
 
-  function applyState(state) {
-    if (!state || !state.pops || !state.links) throw new Error("Dati incompleti");
-
-    pops = state.pops;
-    links = state.links;
-
-    clearSelections();
-    setLinkMode(false);
-    render();
-    setStatus("Import OK.");
+  function loop() {
+    requestAnimationFrame(loop);
+    // Loop per animazioni fluide se necessarie
   }
 
-  function exportPDF() {
-    setStatus("Stampa: scegli Salva come PDF.");
-    window.print();
+  // --- DATA ---
+  function exportData() {
+    const data = JSON.stringify({ version: 1, pops, links });
+    const blob = new Blob([data], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = "mappa_mentale.json";
+    a.click();
   }
 
-  board.addEventListener("mousedown", function (e) {
-    if (e.target === board) {
-      clearSelections();
-      setLinkMode(false);
-      setStatus("Pronto");
-    }
-  });
-
-  board.addEventListener("dblclick", function (e) {
-    if (e.target && e.target.closest && e.target.closest(".pop")) return;
-    var p = screenToWorld(e.clientX, e.clientY);
-    var pos = clampToBoard(p.x, p.y);
-    createPop(pos.x, pos.y);
-  });
-
-  window.addEventListener("keydown", function (e) {
-    var key = (e.key || "").toLowerCase();
-    if (key === "delete" || key === "backspace") {
-      var active = document.activeElement;
-      var inEditor = active && active.tagName === "TEXTAREA";
-      if (!inEditor) { e.preventDefault(); deleteSelected(); }
-    }
-    if (key === "escape") setLinkMode(false);
-  });
-
-  btnNew.addEventListener("click", function () {
-    var r = boardRect();
-    createPop(20 + Math.random()*(r.width-260), 20 + Math.random()*(r.height-160));
-  });
-  btnLink.addEventListener("click", function () { setLinkMode(!linkingFrom); });
-  btnDelete.addEventListener("click", deleteSelected);
-  btnMove.addEventListener("click", function () { setMoveMode(!moveMode); });
-
-  btnPan.addEventListener("click", function () {
-    var newOn = !panMode;
-    if (newOn) {
-      setMoveMode(false);
-      setLinkMode(false);
-    }
-    setPanMode(newOn);
-  });
-
-  btnPdf.addEventListener("click", exportPDF);
-  btnImport.addEventListener("click", doImport);
-  btnZoomIn.addEventListener("click", function(){ zoomAroundCenter(1.15); });
-  btnZoomOut.addEventListener("click", function(){ zoomAroundCenter(1/1.15); });
-
-  // Apertura pannello Opzioni salvataggio (come file 45)
-  if (btnSaveOptions) {
-    btnSaveOptions.addEventListener("click", function(){
-      if (!saveOverlay) return;
-      if (saveFileNameInp) {
-        saveFileNameInp.value = lastSaveBaseName || "";
-      }
-      var radios = saveOverlay.querySelectorAll('input[name="saveFormat"]');
-      var current = lastSaveFormat || "json";
-      radios.forEach(function(r){ r.checked = (r.value === current); });
-      saveOverlay.style.display = "flex";
-      if (saveFileNameInp) {
-        setTimeout(function(){ saveFileNameInp.focus(); saveFileNameInp.select(); }, 50);
-      }
-    });
-  }
-
-  if (btnSaveCancel && saveOverlay) {
-    btnSaveCancel.addEventListener("click", function(){
-      saveOverlay.style.display = "none";
-    });
-  }
-
-  if (saveOverlay) {
-    saveOverlay.addEventListener("click", function(e){
-      if (e.target === saveOverlay) {
-        saveOverlay.style.display = "none";
-      }
-    });
-  }
-
-  if (btnSaveConfirm && saveOverlay) {
-    btnSaveConfirm.addEventListener("click", function(){
-      var baseName = (saveFileNameInp && saveFileNameInp.value.trim()) || "";
-      if (!baseName) baseName = "mappa_mentale";
-
-      var radios = saveOverlay.querySelectorAll('input[name="saveFormat"]');
-      var chosen = "json";
-      radios.forEach(function(r){ if (r.checked) chosen = r.value; });
-
-      lastSaveBaseName = baseName;
-      lastSaveFormat   = chosen;
-
-      if (chosen === "html") exportHTML(baseName);
-      else exportJSON(baseName);
-
-      saveOverlay.style.display = "none";
-    });
-  }
-
-  if (btnQuickSave) {
-    btnQuickSave.addEventListener("click", function(){
-      if (lastSaveBaseName) exportJSON(lastSaveBaseName);
-      else exportJSON(null);
-    });
-  }
-
-  // Collego i pulsanti flottanti alle stesse azioni dei bottoni originali
-  if (btnZoomIn_f) {
-    btnZoomIn_f.addEventListener("click", function(){
-      btnZoomIn.click();
-    });
-  }
-
-  if (btnZoomOut_f) {
-    btnZoomOut_f.addEventListener("click", function(){
-      btnZoomOut.click();
-    });
-  }
-
-  if (btnPan_f) {
-    btnPan_f.addEventListener("click", function(){
-      btnPan.click();
-    });
-  }
-
-  if (btnMove_f) {
-    btnMove_f.addEventListener("click", function(){
-      btnMove.click();
-    });
-  }
-
-  if (btnLink_f) {
-    btnLink_f.addEventListener("click", function(){
-      btnLink.click();
-    });
-  }
-
-  txtColor.addEventListener("input", function(){
-    if (!selectedBoxId) return;
-    var p = pops.find(function(pp){ return pp.id === selectedBoxId; });
-    if (!p) return;
-    p.color = txtColor.value || "#000000";
-
-    var ta = document.querySelector('.pop[data-id="'+p.id+'"] .body');
-    if (ta) ta.style.color = p.color;
-
-    var boxEl = document.querySelector('.pop[data-id="'+p.id+'"]');
-    if (boxEl) boxEl.style.borderColor = p.color;
-
-    renderLinks();
-  });
-
-  btnSizeSmall.addEventListener("click", function(){
-    if (!selectedBoxId) return;
-    var p = pops.find(function(pp){ return pp.id === selectedBoxId; });
-    if (!p) return;
-    p.size = "small";
-    var ta = document.querySelector('.pop[data-id="'+p.id+'"] .body');
-    if (ta) {
-      ta.style.fontSize = "14px";
-      autoGrow(ta, p);
-    }
-    updateTextControls();
-  });
-
-  btnSizeLarge.addEventListener("click", function(){
-    if (!selectedBoxId) return;
-    var p = pops.find(function(pp){ return pp.id === selectedBoxId; });
-    if (!p) return;
-    p.size = "large";
-    var ta = document.querySelector('.pop[data-id="'+p.id+'"] .body');
-    if (ta) {
-      ta.style.fontSize = "20px";
-      autoGrow(ta, p);
-    }
-    updateTextControls();
-  });
-
-  btnBold.addEventListener("click", function(){
-    if (!selectedBoxId) return;
-    var p = pops.find(function(pp){ return pp.id === selectedBoxId; });
-    if (!p) return;
-    p.bold = !p.bold;
-    var ta = document.querySelector('.pop[data-id="'+p.id+'"] .body');
-    if (ta) {
-      ta.style.fontWeight = p.bold ? "700" : "400";
-      autoGrow(ta, p);
-    }
-    updateTextControls();
-  });
-
-  function doImport() {
-    fileInput.value = "";
-    fileInput.click();
-  }
-
-  fileInput.addEventListener("change", function (e) {
-    var file = e.target.files && e.target.files[0];
+  function importData(e) {
+    const file = e.target.files[0];
     if (!file) return;
-    file.text().then(function (text) {
-      var state = parseImportedText(text);
-      applyState(state);
-    }).catch(function (err) {
-      console.error(err);
-      setStatus("Errore import.");
-      alert("Import fallito: usa un file esportato da questa app (JSON o HTML).");
-    });
-  });
+    const reader = new FileReader();
+    reader.onload = (re) => {
+      try {
+        const d = JSON.parse(re.target.result);
+        if (d.pops) pops = d.pops;
+        if (d.links) links = d.links;
+        render();
+        centerView();
+      } catch(err) { alert("Errore file"); }
+    };
+    reader.readAsText(file);
+  }
 
-  btnKeyboardHelp.addEventListener("click", function(){
-    kbdOverlay.style.display = "flex";
-  });
-  btnKbdClose.addEventListener("click", function(){
-    kbdOverlay.style.display = "none";
-  });
-  kbdOverlay.addEventListener("click", function(e){
-    if (e.target === kbdOverlay) {
-      kbdOverlay.style.display = "none";
-    }
-  });
+  // Start
+  init();
 
-  render();
-  setStatus("Pronto");
 })();
 </script>
 </body>
